@@ -24,17 +24,13 @@ else:
     print("Pass query image address as {python3 predict.py <query_image_addr> <output file>}")
     exit()
 
-dataset_path =  os.path.realpath("train")
-images_types = os.listdir(dataset_path)
-
 out_file = open(output,"w")
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
-image_paths = []
-for img_type in images_types:
-    print(img_type)
-    all_img = os.listdir(os.path.join(dataset_path,img_type))
-    for img_n in all_img:
-       image_paths.append(str(img_type) + "/" + str(img_n))
+images_names = os.path.join(dir_path, 'train_images_names.pickle')
+with open(images_names, 'rb') as f:
+    image_paths = pickle.load(f) 
+    
         
     
 def get_location_and_description(image_paths, train = 0):
@@ -57,12 +53,7 @@ def get_location_and_description(image_paths, train = 0):
 
     module_outputs = model(module_inputs, as_dict=True)
     
-    global_image_paths = []
-    if train==1:
-        for each in image_paths:
-            global_image_paths.append(dataset_path + each)
-    else:
-        global_image_paths = image_paths
+    global_image_paths = image_paths
     
     filename_queue = tf.train.string_input_producer(global_image_paths, shuffle=False)
     reader = tf.WholeFileReader()
@@ -86,8 +77,9 @@ def get_location_and_description(image_paths, train = 0):
             
     return results_dict 
 
-    
-with open('model.pickle', 'rb') as f:
+
+model_path = os.path.join(dir_path, 'model.pickle')  
+with open(model_path, 'rb') as f:
     model = pickle.load(f) 
 
 delf = model[0]

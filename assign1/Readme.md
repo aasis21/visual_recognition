@@ -19,8 +19,11 @@ The src folder contains model generation code and these expect training data to 
 - dump_sift_model : computing tf_idf vectors and dumping it
 - dump_delf_feature : extracting delf local features
 
-The final model is pickle of both sift and delf model pickle.
+The final model is basically pickle of both sift and delf model pickle.
 
 #### Prediction
-Prediction (final aggregate to predict ranking for query image) assumes the names of all training images. This assumes model to be present in same folder.   To predict the final ranking:
-	`python3 predict.py <addr of query image> <addr of output txt file>`
+Prediction (final aggregate to predict ranking for query image) assumes the names of all training images. This assumes model.pickle to be present in same folder.   To predict the final ranking:
+
+```
+python3 src/predict.py <addr of query image> <addr of output txt file>
+```
