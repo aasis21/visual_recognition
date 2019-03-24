@@ -1,0 +1,7 @@
+coarse : 3153daf7bb12a61dfed3b7484d4b1e52
+fine: 
+    flowers : 9962d78df61d00660b5168eb189fc786
+    aircrafts : b5b68d886cdedc5eea6e8ac1c566ef86
+    dogs : f8bd28efe18a7717236e8ca3230b12d0
+    cars : 43da6649f1d7227c323abed6e73fe3d2
+    birds : 8838ea04db35017a6666a7530ef9f130
