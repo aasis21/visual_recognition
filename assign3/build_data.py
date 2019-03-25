@@ -57,15 +57,14 @@ def background(img, patches):
         candidate = True
         for each in patches:
             iou = get_iou(patch, each)
-            if(iou > 0.2):
+            if(iou > 0.05):
                 candidate = False
             
         p_img = img[y : y + h , x: x + w ]
         if candidate:
-            print("sdjghj")
             return p_img
 
-    return p[img]
+    return p_img
 
 resnet_input = [224, 224, 3]
 
@@ -133,3 +132,5 @@ def build_dataset(typ = "train"):
     pickle.dump(train_dict,filehandler)
             
 build_dataset("train")
+
+build_dataset("test")

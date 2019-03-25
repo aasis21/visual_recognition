@@ -13,6 +13,8 @@ from skimage import io
 from skimage.transform import resize
 
 from PIL import Image
+from skimage import io
+from skimage.transform import resize
 
 resnet_input = [224, 224, 3]
 
@@ -43,11 +45,10 @@ class voc_dataset(torch.utils.data.Dataset): # Extend PyTorch's Dataset class
         img_name = os.path.join(img_f, "img" + str(idx) + ".jpg")
 #        img = io.imread(img_name)
       
-        img = Image.open(img_name)
+        img = io.imread(img_name)
         
         if self.transform is not None:
             img = self.transform(img)
-            
         if self.dict[idx] == "__background__":
             label = [1,0,0,0]
         if self.dict[idx] == "aeroplane":
@@ -61,19 +62,21 @@ class voc_dataset(torch.utils.data.Dataset): # Extend PyTorch's Dataset class
         
     
 batch_size = 10
-num_epochs = 20
+num_epochs = 16
 learning_rate =  0.001
 hyp_momentum = 0.9
 
 composed_transform = transforms.Compose([ 
+        transforms.ToPILImage(),
         transforms.Resize(224, 224),
+        transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
         ])
     
-train_dataset = voc_dataset(root_dir='/home/aasis21/sem6/visual_recognition/assign3/data', train=True, transform=composed_transform) # Supply proper root_dir
-test_dataset = voc_dataset(root_dir='/home/aasis21/sem6/visual_recognition/assign3/data', train=False, transform=composed_transform) 
+train_dataset = voc_dataset(root_dir='/home/max_entropy/Documents/6thsemester/vr/Assignments/visual_recognition/assign3/data', train=True, transform=composed_transform) # Supply proper root_dir
+test_dataset = voc_dataset(root_dir='/home/max_entropy/Documents/6thsemester/vr/Assignments/visual_recognition/assign3/data', train=False, transform=composed_transform) 
 
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
@@ -82,58 +85,49 @@ import torchvision.models as models
 
 from torch import nn
 
+
 resnet18 = models.resnet18(pretrained=True)
-
-# Freeze model weights
-
 
 resnet18.fc = nn.Linear(resnet18.fc.in_features, 4)
 
 model = resnet18
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+model = model.to(device)
+
 # Find total parameters and trainable parameters
 total_params = sum(p.numel() for p in model.parameters())
-print(f'{total_params:,} total parameters.')
-total_trainable_params = sum(
-    p.numel() for p in model.parameters() if p.requires_grad)
-print(f'{total_trainable_params:,} training parameters.')
+print("total_params:",total_params)
+total_trainable_params = sum( p.numel() for p in model.parameters() if p.requires_grad)
+print("total_trainable_params:" ,  total_trainable_params)
 
 print(model)
 
 import torch.optim as optim
-criterion = nn.CrossEntropyLoss()
+criterion = nn.CrossEntropyLoss().cuda()
 optimizer = optim.SGD(resnet18.parameters(), learning_rate, hyp_momentum)
 
 def train():
     for epoch in range(num_epochs):  
         running_loss = 0.0
-        accuracy_sum = 0.0def background(img, patches):
-    print(img.shape)
-    for i in range(20):
-        x = random.randint(0,img.shape[1] - 50)
-        y = random.randint(0,img.shape[0] - 50)
-        w = random.randint(45,img.shape[1] - x - 1 )
-        h = random.randint(45,img.shape[0] - y - 1)
-        patch = (x, y , x+w, y+h)
-        candidate = True
-        for each in patches:
-            iou = get_iou(patch, each)
-            if(iou > 0.2):
-                candidate = False
-            
-        p_img = img[y : y + h , x: x + w ]
-        if candidate:
-            print("sdjghj")
-            return p_img
-
-    return p[img]
-
+        accuracy_sum = 0.0
+        
         for i, data in enumerate(train_loader, 0):
+            
+            
             inputs, labels = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
             # zero the parameter gradients
             optimizer.zero_grad()
     
             # forward + backward + optimize
             outputs = model(inputs)
+            
+            outputs = outputs.to(device)
+            
             loss = criterion(outputs, torch.max(labels, 1)[1])
             loss.backward()
             optimizer.step()
@@ -150,8 +144,69 @@ def train():
                 print('[%d, %5d] loss: %.3f accurcy: %.3f'  %
                       (epoch + 1, i + 1, running_loss / 20, accuracy_sum/ 20 ))
                 running_loss = 0.0
+                accuracy_sum = 0.0
 
     print('Finished Training')
 
 train()
 
+torch.save(model.state_dict(), "./model/one_layer.pt")
+
+
+
+
+### LOAD TRAINED MODEL
+import torchvision.models as models
+
+from torch import nn
+resnet18 = models.resnet18(pretrained=True)
+resnet18.fc = nn.Linear(resnet18.fc.in_features, 4)
+model = resnet18
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+
+model.load_state_dict(torch.load("./model/one_layer.pt"))
+model.eval()
+
+## Test accuarcy:
+correct = 0
+total = 0
+with torch.no_grad():
+    for data in test_loader:
+        inputs, labels = data
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        outputs = outputs.to(device)
+
+        _, predicted = torch.max(outputs.data, 1)
+        label = torch.max(labels, 1)[1]
+
+        total += labels.size(0)
+        correct += (predicted == label).sum().item()
+
+print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+
+class_correct = list(0. for i in range(4))
+class_total = list(0. for i in range(4))
+with torch.no_grad():
+    for data in test_loader:
+        inputs, labels = data
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        outputs = outputs.to(device)
+        
+        _, predicted = torch.max(outputs, 1)
+        label = torch.max(labels, 1)[1]
+
+        c = (predicted == label)
+        for i in range(c.size(0)):
+            class_correct[label[i]] += int(c[i].item())
+            class_total[label[i]] += 1
+
+
+
+for i in range(4):
+    print('Accuracy of %5s : %2d %%' % (
+        i , 100 * class_correct[i] / class_total[i]))
