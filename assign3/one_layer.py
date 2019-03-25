@@ -106,6 +106,27 @@ optimizer = optim.SGD(resnet18.parameters(), learning_rate, hyp_momentum)
 def train():
     for epoch in range(num_epochs):  
         running_loss = 0.0
+        accuracy_sum = 0.0def background(img, patches):
+    print(img.shape)
+    for i in range(20):
+        x = random.randint(0,img.shape[1] - 50)
+        y = random.randint(0,img.shape[0] - 50)
+        w = random.randint(45,img.shape[1] - x - 1 )
+        h = random.randint(45,img.shape[0] - y - 1)
+        patch = (x, y , x+w, y+h)
+        candidate = True
+        for each in patches:
+            iou = get_iou(patch, each)
+            if(iou > 0.2):
+                candidate = False
+            
+        p_img = img[y : y + h , x: x + w ]
+        if candidate:
+            print("sdjghj")
+            return p_img
+
+    return p[img]
+
         for i, data in enumerate(train_loader, 0):
             inputs, labels = data
             # zero the parameter gradients
@@ -116,27 +137,21 @@ def train():
             loss = criterion(outputs, torch.max(labels, 1)[1])
             loss.backward()
             optimizer.step()
-    
+            
+             #Accuracy
+            output = torch.max(outputs, 1)[1]
+            label = torch.max(labels, 1)[1]
+            correct = (output == label).float().sum()
+            accr = correct/output.shape[0] 
+            accuracy_sum = accuracy_sum + accr
             # print statistics
             running_loss += loss.item()
             if i % 20 == 0:    # print every 2000 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 20))
+                print('[%d, %5d] loss: %.3f accurcy: %.3f'  %
+                      (epoch + 1, i + 1, running_loss / 20, accuracy_sum/ 20 ))
                 running_loss = 0.0
 
     print('Finished Training')
 
 train()
 
-print("sjak")
-for data, targets in test_loader:
-    log_ps = model(data)
-    # Convert to probabilities
-    ps = torch.exp(log_ps)
-    print(ps.shape())
-    
-# Find predictions and correct
-pred = torch.max(ps, dim=1)
-equals = pred == targets
-# Calculate accuracy
-accuracy = torch.mean(equals)
