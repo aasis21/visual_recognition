@@ -62,14 +62,13 @@ class voc_dataset(torch.utils.data.Dataset): # Extend PyTorch's Dataset class
         
     
 batch_size = 10
-num_epochs = 16
+num_epochs = 18
 learning_rate =  0.001
 hyp_momentum = 0.9
 
 composed_transform = transforms.Compose([ 
         transforms.ToPILImage(),
         transforms.Resize(224, 224),
-        transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
@@ -113,6 +112,9 @@ def train():
         running_loss = 0.0
         accuracy_sum = 0.0
         
+        t_loss = [0,0]
+        t_accur = [0,0]
+        
         for i, data in enumerate(train_loader, 0):
             
             
@@ -143,8 +145,13 @@ def train():
             if i % 20 == 0:    # print every 2000 mini-batches
                 print('[%d, %5d] loss: %.3f accurcy: %.3f'  %
                       (epoch + 1, i + 1, running_loss / 20, accuracy_sum/ 20 ))
+                t_loss[0] = t_loss[0] + running_loss
+                t_loss[1] = t_loss[1] +  20
+                t_accur[0] = t_accur[0] + accuracy_sum
+                t_accur[1] =  t_accur[1] + 20
                 running_loss = 0.0
                 accuracy_sum = 0.0
+        print("EPOCH SUMMARY: loss ", t_loss[0]/t_loss[1], " Accuracy " , t_accur[0]/t_accur[1] )
 
     print('Finished Training')
 

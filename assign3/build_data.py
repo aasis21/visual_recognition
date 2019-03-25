@@ -57,7 +57,7 @@ def background(img, patches):
         candidate = True
         for each in patches:
             iou = get_iou(patch, each)
-            if(iou > 0.05):
+            if(iou > 0.2):
                 candidate = False
             
         p_img = img[y : y + h , x: x + w ]
