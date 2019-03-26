@@ -72,7 +72,7 @@ def sliding_window(image_s, stepSize, windowSize):
             yield (x, y, (windowSize[0] ,  windowSize[1]) )
             
 def background2(img, patches):
-    aspect_ratios = [(400, 400), (224,224), (144, 144), (150, 400), (80, 200), (50, 120) ,(180,100), (120, 66), (150, 50)]
+    aspect_ratios = [(400, 400), (224,224), (120, 300) ,(180,100)]
     candidates = []
     for each in aspect_ratios:
         (winH, winW) = each
@@ -152,7 +152,7 @@ def build_dataset(typ = "train"):
             count[3] = count[3] + 1
             print("back", train_id)
             
-        elif g_take_back % 6 == 0:
+        elif g_take_back % 3 == 0:
             b_img = background2(img, objects)
             r_img = resize(b_img, (resnet_input[0], resnet_input[1]))
             io.imsave(c_dir + "/data/" + typ + "/img" + str(train_id) + ".jpg",r_img)
@@ -165,9 +165,8 @@ def build_dataset(typ = "train"):
     pickle.dump(train_dict,filehandler)
     return count
             
-#count = build_dataset("train")
-#print(count)
-count = build_dataset("test")
-print(count)
+count1 = build_dataset("train")
+count2 = build_dataset("test")
+print(count1,count2)
 
 

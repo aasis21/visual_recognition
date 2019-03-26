@@ -73,7 +73,7 @@ model = resnet18
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
-model.load_state_dict(torch.load("./model/one_layer.pt", map_location='cpu'))
+model.load_state_dict(torch.load("./model/one_layer1.pt", map_location='cpu'))
 model.eval()
 
 
@@ -106,9 +106,12 @@ def give_bounding_box(img_name, actual_box):
         # loop over the sliding window for each layer of the pyramid
 #        print("----------------------------------------------------------------")
         to_mult = image.shape[0]/ resized.shape[0]
-        aspect_ratios = [(400, 400), (224,224),(96, 156), (156,96), (150, 400), (180,100), (120, 66), (150, 50)]
+#        aspect_ratios = [(400, 400), (224,224),(96, 156), (156,96), (150, 400), (180,100), (120, 66), (150, 50)]
+        aspect_ratios = [(256, 256), (96, 256), (156,96)]
+
         for each in aspect_ratios:
             count += 1
+#            print(count)
             (winH, winW) = each
             for (x, y, window) in sliding_window(resized, stepSize=32, windowSize=(winH, winW)):
                 # if the window does not meet our desired window size, ignore it
@@ -123,44 +126,53 @@ def give_bounding_box(img_name, actual_box):
                     predicted = torch.max(outputs, 1)[1]
                     prob = F.softmax(outputs[0], dim=0)
                     
-                if(predicted[0].item() != 0 and prob[predicted[0].item()] > 0.6):
-                    boxes.append( (x*to_mult ,y*to_mult,(x + window.shape[1]) *to_mult, (y + window.shape[0]) *to_mult,prob[predicted[0].item()].item(), predicted[0].item() ) )
+                if(predicted[0].item() != 0 and prob[predicted[0].item()] > 0.88):
+                    xmin = x*to_mult
+                    ymin = y*to_mult
+                    xmax = (x + window.shape[1]) *to_mult
+                    ymax = (y + window.shape[0]) *to_mult
+                    label = predicted[0].item()
+                    score = prob[predicted[0].item()]
+                    if score < 0.88:
+                        print("c1")
+                        continue
+                    if label == 2 and (ymax-ymin) < (xmax-xmin):
+                        print("c2")
+                        continue
+                    if label == 3 and (1.1 * (ymax-ymin)) < (xmax-xmin):
+                        print("c3")
+                        continue
+                    boxes.append( (xmin, ymin, xmax, ymax, score, label) )
 #                    print(x*to_mult ,y*to_mult,(x + window.shape[1]) *to_mult, (y + window.shape[0]) *to_mult,prob[predicted[0].item()].item(), predicted[0].item() )
                     
-    print("window Count :", count)
-
-    orig = image.copy()
-    img = image.copy()
     boxes = np.array(boxes)
-    for (startX, startY, endX, endY, _, _ ) in boxes:
-        cv2.rectangle(orig, (int(startX), int(startY)), (int(endX), int(endY)), (0, 0 , 255), 2)
-
     pick = nms2(boxes, 0.1)
     print("[x] before applying non-maximum, %d bounding boxes" % (boxes.shape[0]) )
     print("[x] after applying non-maximum, %d bounding boxes" % (len(pick)) )    
-    for (startX, startY, endX, endY, cfd, lbl) in pick:
-        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (0, 255, 0), 2)
-        cv2.putText(img, str(lbl) ,(int(startX), int(startY)+ 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
-        cv2.putText(img, str(int(cfd*100)) ,(int(endX) - 20, int(endY) - 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
-    for (startX, startY, endX, endY, lbl) in actual_box:
-        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (255, 255, 0), 2)
-        cv2.putText(img, str(lbl) ,(int(startX), int(startY) + 20), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(150,255,150), 2)
-        
-    plt.imshow(img)
-    plt.show()
+    
+#
+#    img = image.copy()
+#    for (startX, startY, endX, endY, cfd, lbl) in pick:
+#        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (0, 255, 0), 2)
+#        cv2.putText(img, str(lbl) ,(int(startX), int(startY)+ 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
+#        cv2.putText(img, str(int(cfd*100)) ,(int(endX) - 20, int(endY) - 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
+#    for (startX, startY, endX, endY, lbl) in actual_box:
+#        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (255, 255, 0), 2)
+#        cv2.putText(img, str(lbl) ,(int(startX), int(startY) + 20), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(150,255,150), 2)
+#        
+#    plt.imshow(img)
+#    plt.show()
+
     boxes = list()
     labels = list()
     scores = list()
     for xmin , ymin, xmax , ymax , score , label  in pick:
-        if score < 85:
-            continue
-        if label == 2 and (ymax-ymin) < (xmax-xmin):
-            continue
         boxes.append(torch.tensor([xmin, ymin, xmax, ymax]))
         labels.append(float(label))
         scores.append(score)
     
     r_boxes = torch.tensor(boxes) if len(boxes) == 0 else torch.stack(boxes)
+    
 
     return r_boxes , torch.tensor(labels), torch.tensor(scores)
     
@@ -304,13 +316,13 @@ with torch.no_grad():
          det_boxes.append(p_boxes)
          det_labels.append(p_labels)
          det_scores.append(p_scores)
-#    
-#    det_boxes = [b.to(device) for b in det_boxes]
-#    det_labels = [l.to(device) for l in det_labels]
-#    det_scores = [b.to(device) for b in det_scores]
-#    true_boxes = [b.to(device) for b in true_boxes]    
-#    true_labels = [l.to(device) for l in true_labels]
-#    true_difficulties = [d.to(device) for d in true_difficulties]     
+    
+    det_boxes = [b.to(device) for b in det_boxes]
+    det_labels = [l.to(device) for l in det_labels]
+    det_scores = [b.to(device) for b in det_scores]
+    true_boxes = [b.to(device) for b in true_boxes]    
+    true_labels = [l.to(device) for l in true_labels]
+    true_difficulties = [d.to(device) for d in true_difficulties]     
     
     APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties)
     print(APs, mAP)
