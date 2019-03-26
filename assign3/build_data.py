@@ -66,11 +66,42 @@ def background(img, patches):
 
     return p_img
 
+def sliding_window(image_s, stepSize, windowSize):
+    for y in range(0, image_s[0], stepSize):
+        for x in range(0, image_s[1], stepSize):
+            yield (x, y, (windowSize[0] ,  windowSize[1]) )
+            
+def background2(img, patches):
+    aspect_ratios = [(400, 400), (224,224), (144, 144), (150, 400), (80, 200), (50, 120) ,(180,100), (120, 66), (150, 50)]
+    candidates = []
+    for each in aspect_ratios:
+        (winH, winW) = each
+        for (x, y, window_s) in sliding_window(img.shape, stepSize=32, windowSize=(winH, winW)):
+            if window_s[0] != winH or window_s[1] != winW:
+                    continue
+            candidate = True
+            for each in patches:
+                iou = get_iou((x, y , x + window_s[1], y + window_s[0]), each)
+                if(iou > 0.2):
+                    candidate = False
+            if candidate:
+                candidates.append((x, y , x + window_s[1], y + window_s[0]))
+    
+    if len(candidates) == 0:
+        return background(img, patches)
+    
+    crd = random.choice(candidates)
+    return img[crd[1]: crd[3] , crd[0] : crd[2]]
+                
+                
+                    
+                        
+
 resnet_input = [224, 224, 3]
 
 c_dir = os.getcwd()
 
-g_take_back = 0
+
 def build_dataset(typ = "train"):
     print("Building dataset from PASCAL VOC DATASET")
     train_img_addr = c_dir + "/" + "VOC_" + typ + "/JPEGImages"
@@ -78,8 +109,9 @@ def build_dataset(typ = "train"):
     train_images = os.listdir(train_img_addr)
     train_id = 0
     train_dict = {}
-    
-    for each in train_images:
+    g_take_back = 0
+    count = [0,0,0,0,0]
+    for each in train_images[:100]:
         tree =  ET.parse( train_ann_addr + '/' + each[:-3] + 'xml')
         root = tree.getroot()
         objects = []
@@ -102,35 +134,39 @@ def build_dataset(typ = "train"):
                 train_dict[train_id] = name
                 train_id = train_id + 1
                 print(train_id)
-                
-        global g_take_back
-        
+                if name == "aeroplane":
+                    count[0] = count[0] + 1
+                if name == "bottle":
+                    count[1] = count[1] + 1
+                if name == "chair":
+                    count[2] = count[2] + 1
+                            
         g_take_back = g_take_back + 1
         
         if take_back == 1:
-            b_img = background(img, objects)
+            b_img = background2(img, objects)
             r_img = resize(b_img, (resnet_input[0], resnet_input[1]))
             io.imsave(c_dir + "/data/" + typ + "/img" + str(train_id) + ".jpg",r_img)
             train_dict[train_id] = '__background__'
             train_id = train_id + 1
+            count[3] = count[3] + 1
             print("back", train_id)
-        elif g_take_back % 5 == 0:
-            b_img = background(img, objects)
+            
+        elif g_take_back % 2 == 0:
+            b_img = background2(img, objects)
             r_img = resize(b_img, (resnet_input[0], resnet_input[1]))
             io.imsave(c_dir + "/data/" + typ + "/img" + str(train_id) + ".jpg",r_img)
             train_dict[train_id] = '__background__'
             train_id = train_id + 1
+            count[4] = count[4] + 1
             print("back", train_id)
-            
-            
-
-                
-   
-            
     
     filehandler = open("data/" + typ +".pkl","wb")
     pickle.dump(train_dict,filehandler)
+    return count
             
-build_dataset("train")
-
+count = build_dataset("train")
+print(count)
 build_dataset("test")
+
+

@@ -73,9 +73,10 @@ composed_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
         ])
-    
-train_dataset = voc_dataset(root_dir='/home/max_entropy/Documents/6thsemester/vr/Assignments/visual_recognition/assign3/data', train=True, transform=composed_transform) # Supply proper root_dir
-test_dataset = voc_dataset(root_dir='/home/max_entropy/Documents/6thsemester/vr/Assignments/visual_recognition/assign3/data', train=False, transform=composed_transform) 
+c_dir = os.getcwd()
+   
+train_dataset = voc_dataset(root_dir= c_dir + '/data', train=True, transform=composed_transform) # Supply proper root_dir
+test_dataset = voc_dataset(root_dir= c_dir + '/data', train=False, transform=composed_transform) 
 
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
@@ -90,6 +91,13 @@ resnet18 = models.resnet18(pretrained=True)
 resnet18.fc = nn.Linear(resnet18.fc.in_features, 4)
 
 model = resnet18
+
+ct = 0 
+for child in model.children():
+    ct += 1
+    if ct < 8:
+        for param in child.parameters():
+            param.requires_grad = False
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
