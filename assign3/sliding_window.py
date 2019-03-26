@@ -34,7 +34,7 @@ if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
     
-def pyramid(image, scale=1.5, minSize=(30, 30)):
+def pyramid(image, scale=2, minSize=(60, 60)):
     yield image
     # keep looping over the pyramid
     while True:
@@ -106,7 +106,7 @@ def give_bounding_box(img_name, actual_box):
         # loop over the sliding window for each layer of the pyramid
 #        print("----------------------------------------------------------------")
         to_mult = image.shape[0]/ resized.shape[0]
-        aspect_ratios = [(256,256), (96, 156), (156,96), (400, 400)  ]
+        aspect_ratios = [(400, 400), (224,224),(96, 156), (156,96), (150, 400), (180,100), (120, 66), (150, 50)]
         for each in aspect_ratios:
             count += 1
             (winH, winW) = each
@@ -145,13 +145,17 @@ def give_bounding_box(img_name, actual_box):
     for (startX, startY, endX, endY, lbl) in actual_box:
         cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (255, 255, 0), 2)
         cv2.putText(img, str(lbl) ,(int(startX), int(startY) + 20), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(150,255,150), 2)
-#        
-#    plt.imshow(img)
-#    plt.show()
+        
+    plt.imshow(img)
+    plt.show()
     boxes = list()
     labels = list()
     scores = list()
     for xmin , ymin, xmax , ymax , score , label  in pick:
+        if score < 85:
+            continue
+        if label == 2 and (ymax-ymin) < (xmax-xmin):
+            continue
         boxes.append(torch.tensor([xmin, ymin, xmax, ymax]))
         labels.append(float(label))
         scores.append(score)
@@ -215,6 +219,7 @@ def get_ground_truth(xml_file):
             labels.append(3.0)
             difficulties.append(0.0)
             actual_boxes.append([xmin, ymin, xmax, ymax, 3])
+            
     r_boxes = torch.tensor(boxes) if len(boxes) == 0 else torch.stack(boxes)
     return actual_boxes, r_boxes, torch.tensor(labels), torch.tensor(difficulties)
 #    
@@ -281,13 +286,17 @@ det_scores = list()
 true_boxes = list()
 true_labels = list()
 true_difficulties = list()
-
+ct = 0
 from maps import calculate_mAP
 with torch.no_grad():
-    for each in train_images[:50]:
+    for each in train_images[:500]:
+         ct += 1
+         print(each, ct)
          img_name = train_img_addr + '/' + each 
          xml_file = train_ann_addr + '/' + each[:-3] + 'xml'
          actual_boxes, act_boxes, act_labels, actual_difficulties = get_ground_truth(xml_file)
+         if len(actual_boxes) == 0:
+             continue
          p_boxes, p_labels, p_scores = give_bounding_box(img_name, actual_boxes)
          true_boxes.append(act_boxes)
          true_labels.append(act_labels)
