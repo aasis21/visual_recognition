@@ -68,6 +68,7 @@ hyp_momentum = 0.9
 
 composed_transform = transforms.Compose([ 
         transforms.ToPILImage(),
+        transforms.RandomApply([transforms.RandomCrop((224,224))],p = 0.3),
         transforms.Resize(224, 224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),

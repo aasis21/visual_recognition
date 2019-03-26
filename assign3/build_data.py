@@ -111,7 +111,7 @@ def build_dataset(typ = "train"):
     train_dict = {}
     g_take_back = 0
     count = [0,0,0,0,0]
-    for each in train_images[:100]:
+    for each in train_images:
         tree =  ET.parse( train_ann_addr + '/' + each[:-3] + 'xml')
         root = tree.getroot()
         objects = []
@@ -152,7 +152,7 @@ def build_dataset(typ = "train"):
             count[3] = count[3] + 1
             print("back", train_id)
             
-        elif g_take_back % 2 == 0:
+        elif g_take_back % 6 == 0:
             b_img = background2(img, objects)
             r_img = resize(b_img, (resnet_input[0], resnet_input[1]))
             io.imsave(c_dir + "/data/" + typ + "/img" + str(train_id) + ".jpg",r_img)
@@ -165,8 +165,9 @@ def build_dataset(typ = "train"):
     pickle.dump(train_dict,filehandler)
     return count
             
-count = build_dataset("train")
+#count = build_dataset("train")
+#print(count)
+count = build_dataset("test")
 print(count)
-build_dataset("test")
 
 
