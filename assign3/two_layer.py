@@ -89,24 +89,59 @@ import torchvision.models as models
 import torch
 from torch import nn
 
+class resnet_two_layer(torch.nn.Module):
+    def __init__(self):
+        torch.nn.Module.__init__(self)
+        model = models.resnet18(pretrained=True)
+        self.features = nn.Sequential(*list(model.children())[0:6])
+        self.final_conv=torch.nn.Conv2d(128, 10, kernel_size=1, stride=1, padding=0)
+#        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Sequential(nn.Linear(7840, 4))
+
+#        self.fc = nn.Sequential(nn.Linear(7840, n_classes), nn.LogSoftmax(dim=1))
+#        
+#        for param in self.features.parameters():
+#            param.requires_grad = False
+
+    def forward(self, X):
+        X = self.features(X)
+        X = self.final_conv(X)
+        X = X.view(X.size(0), -1)
+        X = self.fc(X)
+
+        return X
     
-model = models.resnet18(pretrained=True)
-modules=list(model.children())[0:7] 
-modules.append(list(model.children())[8])
-modules.append(nn.Linear(in_features = 256, out_features = 4))
-model=nn.Sequential(*modules)
+model_mid = resnet_two_layer()
+pytorch_total_params = sum(p.numel() for p in model_mid.parameters() )
+print(pytorch_total_params)
+print(model_mid)
 
-print(model)
+total_params = sum(p.numel() for p in model_mid.parameters())
+print(f'{total_params:,} total parameters.')
+total_trainable_params = sum(
+    p.numel() for p in model_mid.parameters() if p.requires_grad)
+print(f'{total_trainable_params:,} training parameters.')
 
-ct = 0 
-for child in model.children():
-    ct += 1
-    print(ct, child)
-    if ct < 9:
-        for param in child.parameters():
-            param.requires_grad = False
+#
+
+#model = models.resnet18(pretrained=True)
+#modules=list(model.children())[0:7] 
+#modules.append(list(model.children())[8])
+#modules.append(nn.Linear(in_features = 256, out_features = 4))
+#model=nn.Sequential(*modules)
+#
+#print(model)
+#
+#ct = 0 
+#for child in model.children():
+#    ct += 1
+#    print(ct, child)
+#    if ct < 9:
+#        for param in child.parameters():
+#            param.requires_grad = False
 
 
+model = model_mid
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -128,11 +163,11 @@ def train():
         running_loss = 0.0
         accuracy_sum = 0.0
         
-        t_loss = [0,0]
-        t_accur = [0,0]
+        t_loss = [0,0.00000000001]
+        t_accur = [0,0.0000000001]
         
         for i, data in enumerate(train_loader, 0):
-            
+            print("dhjasfhjk", i)
             
             inputs, labels = data
             inputs = inputs.to(device)
