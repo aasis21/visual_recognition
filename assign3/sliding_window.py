@@ -34,7 +34,7 @@ if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
     
-def pyramid(image, scale=2, minSize=(60, 60)):
+def pyramid(image, scale, minSize=(60, 60)):
     yield image
     # keep looping over the pyramid
     while True:
@@ -73,7 +73,7 @@ model = resnet18
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
-model.load_state_dict(torch.load("./model/one_layer1.pt", map_location='cpu'))
+model.load_state_dict(torch.load("./model/one_layer_adam.pt", map_location='cpu'))
 model.eval()
 
 
@@ -90,65 +90,59 @@ def give_bounding_box(img_name, actual_box):
     count = 0    
     boxes = []
     
-    img_t = composed_transform(image)
-    img = img_t.permute(1, 2, 0).numpy()
-    with torch.no_grad():
-        inputs = img_t.unsqueeze(0).to(device)
-        outputs = model(inputs)
-        outputs = outputs.to(device)
-        predicted = torch.max(outputs, 1)[1]
-        prob = F.softmax(outputs[0], dim=0)
-            
-    if(predicted[0].item() != 0 and prob[predicted[0].item()] > 0.6):
-        boxes.append( (10 , 10 ,(image.shape[1]) - 10 , (image.shape[0]) - 10 ,prob[predicted[0].item()].item(), predicted[0].item() ) )
+    image_batch = []
+    image_shape = []
     
-    for resized in pyramid(image, scale=1.5):
-        # loop over the sliding window for each layer of the pyramid
-#        print("----------------------------------------------------------------")
+    img_t = composed_transform(image)
+    image_batch.append(img_t)
+    image_shape.append((10, 10, (image.shape[1]) - 10, (image.shape[0]) - 10))
+  
+    for resized in pyramid(image, scale=1.8):
         to_mult = image.shape[0]/ resized.shape[0]
 #        aspect_ratios = [(400, 400), (224,224),(96, 156), (156,96), (150, 400), (180,100), (120, 66), (150, 50)]
-        aspect_ratios = [(256, 256), (96, 256), (156,96)]
-
+        aspect_ratios = [(200, 200), (96, 256), (156,96)]
         for each in aspect_ratios:
             count += 1
-#            print(count)
             (winH, winW) = each
-            for (x, y, window) in sliding_window(resized, stepSize=32, windowSize=(winH, winW)):
-                # if the window does not meet our desired window size, ignore it
+            for (x, y, window) in sliding_window(resized, stepSize=50, windowSize=(winH, winW)):
                 if window.shape[0] != winH or window.shape[1] != winW:
                     continue
                 img_t = composed_transform(window)
-                img = img_t.permute(1, 2, 0).numpy()
-                with torch.no_grad():
-                    inputs = img_t.unsqueeze(0).to(device)
-                    outputs = model(inputs)
-                    outputs = outputs.to(device)
-                    predicted = torch.max(outputs, 1)[1]
-                    prob = F.softmax(outputs[0], dim=0)
-                    
-                if(predicted[0].item() != 0 and prob[predicted[0].item()] > 0.88):
-                    xmin = x*to_mult
-                    ymin = y*to_mult
-                    xmax = (x + window.shape[1]) *to_mult
-                    ymax = (y + window.shape[0]) *to_mult
-                    label = predicted[0].item()
-                    score = prob[predicted[0].item()]
-                    if score < 0.88:
-                        print("c1")
-                        continue
-                    if label == 2 and (ymax-ymin) < (xmax-xmin):
-                        print("c2")
-                        continue
-                    if label == 3 and (1.1 * (ymax-ymin)) < (xmax-xmin):
-                        print("c3")
-                        continue
-                    boxes.append( (xmin, ymin, xmax, ymax, score, label) )
-#                    print(x*to_mult ,y*to_mult,(x + window.shape[1]) *to_mult, (y + window.shape[0]) *to_mult,prob[predicted[0].item()].item(), predicted[0].item() )
-                    
+                xmin = x*to_mult
+                ymin = y*to_mult
+                xmax = (x + window.shape[1]) *to_mult
+                ymax = (y + window.shape[0]) *to_mult
+                image_batch.append(img_t)
+                image_shape.append((xmin, ymin, xmax, ymax))
+         
+    with torch.no_grad():
+        inputs = torch.stack(image_batch).to(device) if len(image_batch) != 0 else torch.tensor(image_batch).to(device)
+        outputs = model(inputs)
+        outputs = outputs.to(device)
+        predicted = torch.max(outputs, 1)[1]
+        for i, each in enumerate(image_shape):
+            xmin, ymin, xmax, ymax = each
+            label = predicted[i].item()
+            prob = F.softmax(outputs[i], dim=0)
+            score = prob[label].item()
+            if label == 0:
+                continue
+            if score < 0.7 and (label == 2 or label == 3):
+#                print("c1")
+                continue
+#            if label == 2 and (ymax-ymin) < (xmax-xmin):
+##                print("c2")
+#                continue
+            if label == 3 and (1.1 * (ymax-ymin)) < (xmax-xmin):
+#                print("c3")
+                continue
+            boxes.append( (xmin, ymin, xmax, ymax, score, label) )
+            
+
     boxes = np.array(boxes)
     pick = nms2(boxes, 0.1)
-    print("[x] before applying non-maximum, %d bounding boxes" % (boxes.shape[0]) )
-    print("[x] after applying non-maximum, %d bounding boxes" % (len(pick)) )    
+#    print("[x] before applying non-maximum, %d bounding boxes" % (boxes.shape[0]) )
+#    print("[x] after applying non-maximum, %d bounding boxes" % (len(pick)) )    
     
 #
 #    img = image.copy()
@@ -183,16 +177,6 @@ test_i2 = ["178", "108", "127", "128", "144", "151", "157", "172", "181", "185",
 test_i3 = ["412", "418", "441", "447", "467", "473", "487","490"]
 
 
-ground_dict_a = {}
-predict_dict_a = {} 
-ground_dict_b = {}
-predict_dict_b = {} 
-ground_dict_c = {}
-predict_dict_c = {} 
-
-#for each in test_image:
-#    img_name = "./VOC_test/JPEGImages/0000" + each + ".jpg"
-#    give_bounding_box(img_name)
 
 c_dir = os.getcwd()
 typ = "test"
@@ -234,64 +218,8 @@ def get_ground_truth(xml_file):
             
     r_boxes = torch.tensor(boxes) if len(boxes) == 0 else torch.stack(boxes)
     return actual_boxes, r_boxes, torch.tensor(labels), torch.tensor(difficulties)
-#    
-#for each in train_images[:500]:
-#    img_name = train_img_addr + '/' + each 
-#    # ground_truth
-#    tree =  ET.parse( train_ann_addr + '/' + each[:-3] + 'xml')
-#    root = tree.getroot()
-#    objects = [[], [], []]
-#    actual_boxes = []
-#    for obj in root.findall('object'):
-#        name = obj.find('name').text
-#        box = obj.find('bndbox')
-#        xmin = int(box.find('xmin').text)
-#        ymin = int(box.find('ymin').text)
-#        xmax = int(box.find('xmax').text)
-#        ymax = int(box.find('ymax').text)
-#        if name == 'aeroplane':
-#            objects[0].append([xmin, ymin, xmax, ymax])
-#            actual_boxes.append([xmin, ymin, xmax, ymax, 1])
-#        if name == 'bottle':
-#            objects[1].append([xmin, ymin, xmax, ymax])
-#            actual_boxes.append([xmin, ymin, xmax, ymax, 2])
-#        if name == 'chair':
-#            objects[2].append([xmin, ymin, xmax, ymax])
-#            actual_boxes.append([xmin, ymin, xmax, ymax, 3])
-#
-#    ground_dict_a[img_name] = objects[0]
-#    ground_dict_b[img_name] = objects[1]
-#    ground_dict_c[img_name] = objects[2]
-#    
-#    # prediction
-#    objects = [[], [], []]
-#    scores = [[], [], []]
-#    print("----------------------------------------------------------------")
-#    ct += 1
-#    print(img_name, ct)
-#    print(actual_boxes)
-#    pick = give_bounding_box(img_name, actual_boxes)
-#    for xmin , ymin, xmax , ymax , score , label  in pick:
-#        if label == 1:
-#            objects[0].append([xmin, ymin, xmax, ymax])
-#            scores[0].append(score)
-#        if label == 2:
-#            objects[1].append([xmin, ymin, xmax, ymax])
-#            scores[1].append(score)
-#        if label == 3:
-#            objects[2].append([xmin, ymin, xmax, ymax])
-#            scores[2].append(score)
-#    
-#    predict_dict_a[img_name] = { "boxes" : objects[0], "scores" : scores[0] }
-#    predict_dict_b[img_name] =  { "boxes" : objects[1], "scores" : scores[1] }
-#    predict_dict_c[img_name] =  { "boxes" : objects[2], "scores" : scores[2] }
-#    
-#import json
-#with open('ground_truth_boxes.json', 'w') as fp:
-#    json.dump(ground_dict_c, fp)
-#with open('predicted_boxes.json', 'w') as fp:
-#    json.dump(predict_dict_c, fp)
-#    
+
+ 
 det_boxes = list()
 det_labels = list()
 det_scores = list()
@@ -300,15 +228,20 @@ true_labels = list()
 true_difficulties = list()
 ct = 0
 from maps import calculate_mAP
+
 with torch.no_grad():
-    for each in train_images[:500]:
+    for each in train_images:
          ct += 1
-         print(each, ct)
+         if ct % 50 == 0:  
+            APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties)
+            print(ct, APs, mAP)
+            
          img_name = train_img_addr + '/' + each 
          xml_file = train_ann_addr + '/' + each[:-3] + 'xml'
          actual_boxes, act_boxes, act_labels, actual_difficulties = get_ground_truth(xml_file)
          if len(actual_boxes) == 0:
              continue
+#         print(each, ct)
          p_boxes, p_labels, p_scores = give_bounding_box(img_name, actual_boxes)
          true_boxes.append(act_boxes)
          true_labels.append(act_labels)
@@ -316,16 +249,8 @@ with torch.no_grad():
          det_boxes.append(p_boxes)
          det_labels.append(p_labels)
          det_scores.append(p_scores)
-    
-    det_boxes = [b.to(device) for b in det_boxes]
-    det_labels = [l.to(device) for l in det_labels]
-    det_scores = [b.to(device) for b in det_scores]
-    true_boxes = [b.to(device) for b in true_boxes]    
-    true_labels = [l.to(device) for l in true_labels]
-    true_difficulties = [d.to(device) for d in true_difficulties]     
-    
-    APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties)
-    print(APs, mAP)
          
          
+# {'chair': 0.2012559026479721, 'bottle': 0.1512237787246704, 'aeroplane': 0.37917467951774597} 0.24388480186462402
+
          

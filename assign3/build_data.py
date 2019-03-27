@@ -72,7 +72,7 @@ def sliding_window(image_s, stepSize, windowSize):
             yield (x, y, (windowSize[0] ,  windowSize[1]) )
             
 def background2(img, patches):
-    aspect_ratios = [(400, 400), (224,224), (120, 300) ,(180,100)]
+    aspect_ratios = [(400, 400), (224,224), (120, 300) ,(250,100)]
     candidates = []
     for each in aspect_ratios:
         (winH, winW) = each
@@ -147,15 +147,18 @@ def build_dataset(typ = "train"):
             b_img = background2(img, objects)
             r_img = resize(b_img, (resnet_input[0], resnet_input[1]))
             io.imsave(c_dir + "/data/" + typ + "/img" + str(train_id) + ".jpg",r_img)
+            io.imsave(c_dir + "/data/" + "back" + "/img" + str(train_id) + ".jpg",r_img)
             train_dict[train_id] = '__background__'
             train_id = train_id + 1
             count[3] = count[3] + 1
             print("back", train_id)
             
-        elif g_take_back % 3 == 0:
+        elif g_take_back % 4 == 0:
             b_img = background2(img, objects)
             r_img = resize(b_img, (resnet_input[0], resnet_input[1]))
             io.imsave(c_dir + "/data/" + typ + "/img" + str(train_id) + ".jpg",r_img)
+            io.imsave(c_dir + "/data/" + "back" + "/img" + str(train_id) + ".jpg",r_img)
+
             train_dict[train_id] = '__background__'
             train_id = train_id + 1
             count[4] = count[4] + 1

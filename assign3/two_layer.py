@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+
+# -*- coding: utf-8 -*-
 from __future__ import division, print_function, unicode_literals
 import numpy as np
 import torch
@@ -60,6 +62,7 @@ class voc_dataset(torch.utils.data.Dataset): # Extend PyTorch's Dataset class
             
         return img,  np.array(label)
         
+        
     
 batch_size = 10
 num_epochs = 18
@@ -86,19 +89,24 @@ import torchvision.models as models
 import torch
 from torch import nn
 
+    
+model = models.resnet18(pretrained=True)
+modules=list(model.children())[0:7] 
+modules.append(list(model.children())[8])
+modules.append(nn.Linear(in_features = 256, out_features = 4))
+model=nn.Sequential(*modules)
 
-resnet18 = models.resnet18(pretrained=True)
-
-resnet18.fc = nn.Linear(resnet18.fc.in_features, 4)
-
-model = resnet18
+print(model)
 
 ct = 0 
 for child in model.children():
     ct += 1
+    print(ct, child)
     if ct < 9:
         for param in child.parameters():
             param.requires_grad = False
+
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -110,11 +118,10 @@ print("total_params:",total_params)
 total_trainable_params = sum( p.numel() for p in model.parameters() if p.requires_grad)
 print("total_trainable_params:" ,  total_trainable_params)
 
-print(model)
 
 import torch.optim as optim
 criterion = nn.CrossEntropyLoss().cuda()
-optimizer = optim.Adam(resnet18.parameters(), learning_rate)
+optimizer = optim.Adam(model.parameters(), learning_rate)
 
 def train():
     for epoch in range(num_epochs):  
@@ -151,7 +158,7 @@ def train():
             accuracy_sum = accuracy_sum + accr
             # print statistics
             running_loss += loss.item()
-            if i % 20 == 0:    # print every 2000 mini-batches
+            if i % 20 == 19:    # print every 2000 mini-batches
                 print('[%d, %5d] loss: %.3f accurcy: %.3f'  %
                       (epoch + 1, i + 1, running_loss / 20, accuracy_sum/ 20 ))
                 t_loss[0] = t_loss[0] + running_loss
@@ -166,63 +173,72 @@ def train():
 
 train()
 
-torch.save(model.state_dict(), "./model/one_layer.pt")
+torch.save(model.state_dict(), "./model/two_layer.pt")
 
 
 
 
-### LOAD TRAINED MODEL
-import torchvision.models as models
-
-from torch import nn
-resnet18 = models.resnet18(pretrained=True)
-resnet18.fc = nn.Linear(resnet18.fc.in_features, 4)
-model = resnet18
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = model.to(device)
-
-model.load_state_dict(torch.load("./model/one_layer.pt"))
-model.eval()
-
-## Test accuarcy:
-correct = 0
-total = 0
-with torch.no_grad():
-    for data in test_loader:
-        inputs, labels = data
-        inputs = inputs.to(device)
-        labels = labels.to(device)
-        outputs = model(inputs)
-        outputs = outputs.to(device)
-
-        _, predicted = torch.max(outputs.data, 1)
-        label = torch.max(labels, 1)[1]
-
-        total += labels.size(0)
-        correct += (predicted == label).sum().item()
-
-print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
-
-class_correct = list(0. for i in range(4))
-class_total = list(0. for i in range(4))
-with torch.no_grad():
-    for data in test_loader:
-        inputs, labels = data
-        inputs = inputs.to(device)
-        labels = labels.to(device)
-        outputs = model(inputs)
-        outputs = outputs.to(device)
-        
-        _, predicted = torch.max(outputs, 1)
-        label = torch.max(labels, 1)[1]
-
-        c = (predicted == label)
-        for i in range(c.size(0)):
-            class_correct[label[i]] += int(c[i].item())
-            class_total[label[i]] += 1
-
-
-
-for i in range(4):
-    print('Accuracy of %5s : %2d %%' % (
-        i , 100 * class_correct[i] / class_total[i]))
+#### LOAD TRAINED MODEL
+#import torchvision.models as models
+#
+#from torch import nn
+#
+#import torchvision.models as models
+#import torch
+#from torch import nn
+#
+#    
+#model = models.resnet18(pretrained=True)
+#modules=list(model.children())[0:7] 
+#modules.append(list(model.children())[8])
+#model=nn.Sequential(*modules)
+#model.fc = nn.Linear(in_features = 256, out_features = 4)
+#
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#model = model.to(device)
+#
+#model.load_state_dict(torch.load("./model/two_layer.pt"))
+#model.eval()
+#
+### Test accuarcy:
+#correct = 0
+#total = 0
+#with torch.no_grad():
+#    for data in test_loader:
+#        inputs, labels = data
+#        inputs = inputs.to(device)
+#        labels = labels.to(device)
+#        outputs = model(inputs)
+#        outputs = outputs.to(device)
+#
+#        _, predicted = torch.max(outputs.data, 1)
+#        label = torch.max(labels, 1)[1]
+#
+#        total += labels.size(0)
+#        correct += (predicted == label).sum().item()
+#
+#print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+#
+#class_correct = list(0. for i in range(4))
+#class_total = list(0. for i in range(4))
+#with torch.no_grad():
+#    for data in test_loader:
+#        inputs, labels = data
+#        inputs = inputs.to(device)
+#        labels = labels.to(device)
+#        outputs = model(inputs)
+#        outputs = outputs.to(device)
+#        
+#        _, predicted = torch.max(outputs, 1)
+#        label = torch.max(labels, 1)[1]
+#
+#        c = (predicted == label)
+#        for i in range(c.size(0)):
+#            class_correct[label[i]] += int(c[i].item())
+#            class_total[label[i]] += 1
+#
+#
+#
+#for i in range(4):
+#    print('Accuracy of %5s : %2d %%' % (
+#        i , 100 * class_correct[i] / class_total[i]))

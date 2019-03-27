@@ -377,6 +377,8 @@ def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, tr
     :param true_difficulties: list of tensors, one tensor for each image containing actual objects' difficulty (0 or 1)
     :return: list of average precisions for all classes, mean average precision (mAP)
     """
+    print("ewuhru")
+
     assert len(det_boxes) == len(det_labels) == len(det_scores) == len(true_boxes) == len(
         true_labels) == len(
         true_difficulties)  # these are all lists of tensors of the same length, i.e. number of images
@@ -457,7 +459,7 @@ def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, tr
             # We need 'original_ind' to update 'true_class_boxes_detected'
 
             # If the maximum overlap is greater than the threshold of 0.5, it's a match
-            if max_overlap.item() > 0.5:
+            if max_overlap.item() > 0.3:
                 # If the object it matched with is 'difficult', ignore it
                 if object_difficulties[ind] == 0:
                     # If this object has already not been detected, it's a true positive
