@@ -124,17 +124,17 @@ def give_bounding_box(img_name, actual_box):
 #    print("[x] after applying non-maximum, %d bounding boxes" % (len(pick)) )    
     
 #
-    img = image.copy()
-    for (startX, startY, endX, endY, cfd, lbl) in pick:
-        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (0, 255, 0), 2)
-        cv2.putText(img, str(lbl) ,(int(startX), int(startY)+ 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
-        cv2.putText(img, str(int(cfd*100)) ,(int(endX) - 20, int(endY) - 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
-    for (startX, startY, endX, endY, lbl) in actual_box:
-        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (255, 255, 0), 2)
-        cv2.putText(img, str(lbl) ,(int(startX), int(startY) + 20), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(150,255,150), 2)
-        
-    plt.imshow(img)
-    plt.show()
+#    img = image.copy()
+#    for (startX, startY, endX, endY, cfd, lbl) in pick:
+#        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (0, 255, 0), 2)
+#        cv2.putText(img, str(lbl) ,(int(startX), int(startY)+ 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
+#        cv2.putText(img, str(int(cfd*100)) ,(int(endX) - 20, int(endY) - 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
+#    for (startX, startY, endX, endY, lbl) in actual_box:
+#        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (255, 255, 0), 2)
+#        cv2.putText(img, str(lbl) ,(int(startX), int(startY) + 20), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(150,255,150), 2)
+#        
+#    plt.imshow(img)
+#    plt.show()
 
     boxes = list()
     labels = list()
@@ -186,9 +186,8 @@ def get_ground_truth(xml_file):
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = resnetTwoLayer()
-model = model.to(device)
-model.load_state_dict(torch.load("./model/two_layer_big_data.pt", map_location='cpu'))
+model = resnetOneLayer().to(device)
+model.load_state_dict(torch.load("./model/one_layer_small_data.pt", map_location='cpu'))
 model.eval()
 
 c_dir = os.getcwd()
@@ -213,7 +212,7 @@ with torch.no_grad():
     for each in train_images:
          ct += 1
          if ct % 50 == 0:  
-            APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties,0.3)
+            APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties, 0.2)
             print(ct, APs, mAP)
             
          img_name = train_img_addr + '/' + each 

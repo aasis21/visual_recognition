@@ -235,9 +235,11 @@ def train_and_test_model(model, saved_name):
 def to_run():    
     model = resnetOneLayer()
     model = model.to(device)
-    train_and_test_model(model,"./model/one_layer_big_data.pt" )
+    train_and_test_model(model,"./model/one_layer_t.pt" )
     
     model = resnetTwoLayer()
     model = model.to(device)
     train_and_test_model(model,"./model/two_layer_t.pt" )
-    
+
+
+
