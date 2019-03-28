@@ -57,7 +57,7 @@ class voc_dataset(torch.utils.data.Dataset): # Extend PyTorch's Dataset class
 
 def resnetOneLayer():
     resnet18 = models.resnet18(pretrained=True)
-    resnet18.fc = nn.Linear(resnet18.fc.in_features, 4)    
+    resnet18.fc = torch.nn.Linear(resnet18.fc.in_features, 4)    
     ct = 0 
     for child in resnet18.children():
         ct += 1
@@ -95,7 +95,7 @@ class resnetTwoLayer(torch.nn.Module):
         return self.fc(x)
         
         
-def train(model, criterion, optimizer, num_epoch, batch_size):
+def train(model, criterion, optimizer, num_epochs, batch_size):
     c_dir = os.getcwd()   
     composed_transform = transforms.Compose([ 
         transforms.ToPILImage(),
@@ -184,7 +184,6 @@ def test_accuracy(model, model_state, batch_size):
     
             total += labels.size(0)
             correct += (predicted == label).sum().item()
-            print(100 * correct/total)
     
     print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
     
@@ -206,11 +205,7 @@ def test_accuracy(model, model_state, batch_size):
             for i in range(c.size(0)):
                 class_correct[label[i]] += int(c[i].item())
                 class_total[label[i]] += 1
-            for i in range(4):
-                print('Accuracy of %5s : %2d %%' % ( i , 100 * class_correct[i] / class_total[i]))
             
-    
-    
     for i in range(4):
         print('Accuracy of %5s : %2d %%' % (
             i , 100 * class_correct[i] / class_total[i]))
@@ -223,8 +218,6 @@ def train_and_test_model(model, saved_name):
     hyp_momentum = 0.9
     batch_size = 100
     
-    
-
     criterion = torch.nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.SGD(model.parameters(), learning_rate, hyp_momentum)
     
@@ -242,10 +235,9 @@ def train_and_test_model(model, saved_name):
 def to_run():    
     model = resnetOneLayer()
     model = model.to(device)
-    train_and_test_model(model,"./model/one_layer_t.pt" )
+    train_and_test_model(model,"./model/one_layer_big_data.pt" )
     
     model = resnetTwoLayer()
     model = model.to(device)
     train_and_test_model(model,"./model/two_layer_t.pt" )
     
-
