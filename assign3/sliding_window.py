@@ -1,7 +1,7 @@
 
 
 
-import os, random , pickle
+import os, random , pickle, cv2
 import xml.etree.ElementTree as ET
 from skimage import io
 from skimage.transform import resize
@@ -10,7 +10,6 @@ from skimage.transform import resize
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from nms import nms2
 
 from models import resnetTwoLayer, resnetOneLayer
 
@@ -58,7 +57,36 @@ def sliding_window(image, stepSize, windowSize):
             # yield the current window
             yield (x, y, image[y:y + windowSize[0], x:x + windowSize[1]])
 
+def non_maximum_suppression(dets, thresh):
+    if len(dets) == 0:
+        return []
+    x1 = dets[:, 0]
+    y1 = dets[:, 1]
+    x2 = dets[:, 2]
+    y2 = dets[:, 3]
+    scores = dets[:, 4]
 
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    order = scores.argsort()[::-1]
+
+    keep = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(i)
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+
+        w = np.maximum(0.0, xx2 - xx1 + 1)
+        h = np.maximum(0.0, yy2 - yy1 + 1)
+        inter = w * h
+        ovr = inter / (areas[i] + areas[order[1:]] - inter)
+
+        inds = np.where(ovr <= thresh)[0]
+        order = order[inds + 1]
+        
+    return dets[keep]
 
 def give_bounding_box(img_name, actual_box):
     image = io.imread(img_name)
@@ -119,7 +147,7 @@ def give_bounding_box(img_name, actual_box):
             
 
     boxes = np.array(boxes)
-    pick = nms2(boxes, 0.1)
+    pick = non_maximum_suppression(boxes, 0.1)
 #    print("[x] before applying non-maximum, %d bounding boxes" % (boxes.shape[0]) )
 #    print("[x] after applying non-maximum, %d bounding boxes" % (len(pick)) )    
     
@@ -190,6 +218,8 @@ model = resnetOneLayer().to(device)
 model.load_state_dict(torch.load("./model/one_layer_small_data.pt", map_location='cpu'))
 model.eval()
 
+map_th = 0.2
+
 c_dir = os.getcwd()
 typ = "test"
 train_img_addr = c_dir + "/" + "VOC_" + typ + "/JPEGImages"
@@ -212,7 +242,7 @@ with torch.no_grad():
     for each in train_images:
          ct += 1
          if ct % 50 == 0:  
-            APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties, 0.2)
+            APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties, map_th)
             print(ct, APs, mAP)
             
          img_name = train_img_addr + '/' + each 
