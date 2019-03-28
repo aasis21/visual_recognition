@@ -1,33 +1,23 @@
 
-import time
-from skimage import io
-from skimage.transform import resize
-import matplotlib.pyplot as plt
 
-# -*- coding: utf-8 -*-
-from __future__ import division, print_function, unicode_literals
-import numpy as np
-import torch
-import torch.utils.data
-import torchvision.transforms as transforms
-from torch.autograd import Variable
-import matplotlib.pyplot as plt
 
 import os, random , pickle
 import xml.etree.ElementTree as ET
 from skimage import io
 from skimage.transform import resize
 
-from PIL import Image
 
 import numpy as np
 import cv2
-import numpy as np
 import matplotlib.pyplot as plt
-from nms import nms, nms2
-import torch.nn.functional as F
+from nms import nms2
 
-from two_layer import resnetTwoLayer
+from models import resnetTwoLayer, resnetOneLayer
+
+import torch
+import torch.nn.functional as F
+import torchvision.transforms as transforms
+import torchvision.models as models
 
 
 import sys
@@ -69,20 +59,6 @@ def sliding_window(image, stepSize, windowSize):
             yield (x, y, image[y:y + windowSize[0], x:x + windowSize[1]])
 
 
-resnet_input = [224, 224, 3]
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = resnetTwoLayer()
-model = model.to(device)
-model.load_state_dict(torch.load("./model/two_layer_t.pt", map_location='cpu'))
-model.eval()
-
-composed_transform = transforms.Compose([ 
-        transforms.ToPILImage(),
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
-        ])
-    
 
 def give_bounding_box(img_name, actual_box):
     image = io.imread(img_name)
@@ -91,6 +67,13 @@ def give_bounding_box(img_name, actual_box):
     
     image_batch = []
     image_shape = []
+    
+    composed_transform = transforms.Compose([ 
+        transforms.ToPILImage(),
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ])
     
     img_t = composed_transform(image)
     image_batch.append(img_t)
@@ -141,17 +124,17 @@ def give_bounding_box(img_name, actual_box):
 #    print("[x] after applying non-maximum, %d bounding boxes" % (len(pick)) )    
     
 #
-    img = image.copy()
-    for (startX, startY, endX, endY, cfd, lbl) in pick:
-        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (0, 255, 0), 2)
-        cv2.putText(img, str(lbl) ,(int(startX), int(startY)+ 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
-        cv2.putText(img, str(int(cfd*100)) ,(int(endX) - 20, int(endY) - 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
-    for (startX, startY, endX, endY, lbl) in actual_box:
-        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (255, 255, 0), 2)
-        cv2.putText(img, str(lbl) ,(int(startX), int(startY) + 20), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(150,255,150), 2)
-        
-    plt.imshow(img)
-    plt.show()
+#    img = image.copy()
+#    for (startX, startY, endX, endY, cfd, lbl) in pick:
+#        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (0, 255, 0), 2)
+#        cv2.putText(img, str(lbl) ,(int(startX), int(startY)+ 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
+#        cv2.putText(img, str(int(cfd*100)) ,(int(endX) - 20, int(endY) - 20 ), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(0,255,0), 2)
+#    for (startX, startY, endX, endY, lbl) in actual_box:
+#        cv2.rectangle(img, (int(startX), int(startY)), (int(endX), int(endY)), (255, 255, 0), 2)
+#        cv2.putText(img, str(lbl) ,(int(startX), int(startY) + 20), cv2.FONT_HERSHEY_SIMPLEX, 1 ,(150,255,150), 2)
+#        
+#    plt.imshow(img)
+#    plt.show()
 
     boxes = list()
     labels = list()
@@ -166,20 +149,6 @@ def give_bounding_box(img_name, actual_box):
 
     return r_boxes , torch.tensor(labels), torch.tensor(scores)
     
-
-
-test_image = ["53", "55", "58", "59", "84", "85", "90", "97"]
-test_i2 = ["178", "108", "127", "128", "144", "151", "157", "172", "181", "185", "195"]
-test_i3 = ["412", "418", "441", "447", "467", "473", "487","490"]
-
-
-
-c_dir = os.getcwd()
-typ = "test"
-train_img_addr = c_dir + "/" + "VOC_" + typ + "/JPEGImages"
-train_ann_addr = c_dir + "/" + "VOC_" + typ + "/Annotations"
-train_images = os.listdir(train_img_addr)
-
 def get_ground_truth(xml_file):
     tree =  ET.parse( xml_file)
     root = tree.getroot()
@@ -215,21 +184,35 @@ def get_ground_truth(xml_file):
     r_boxes = torch.tensor(boxes) if len(boxes) == 0 else torch.stack(boxes)
     return actual_boxes, r_boxes, torch.tensor(labels), torch.tensor(difficulties)
 
- 
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = resnetOneLayer().to(device)
+model.load_state_dict(torch.load("./model/one_layer_small_data.pt", map_location='cpu'))
+model.eval()
+
+c_dir = os.getcwd()
+typ = "test"
+train_img_addr = c_dir + "/" + "VOC_" + typ + "/JPEGImages"
+train_ann_addr = c_dir + "/" + "VOC_" + typ + "/Annotations"
+train_images = os.listdir(train_img_addr)
+
+
 det_boxes = list()
 det_labels = list()
 det_scores = list()
 true_boxes = list()
 true_labels = list()
 true_difficulties = list()
+
 ct = 0
+
 from maps import calculate_mAP
 
 with torch.no_grad():
     for each in train_images:
          ct += 1
          if ct % 50 == 0:  
-            APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties)
+            APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties, 0.2)
             print(ct, APs, mAP)
             
          img_name = train_img_addr + '/' + each 
@@ -247,6 +230,5 @@ with torch.no_grad():
          det_scores.append(p_scores)
          
          
-# {'chair': 0.2012559026479721, 'bottle': 0.1512237787246704, 'aeroplane': 0.37917467951774597} 0.24388480186462402
 
          
