@@ -156,6 +156,7 @@ def train(model, criterion, optimizer, num_epoch, batch_size):
 
 
 def test_accuracy(model, model_state, batch_size):
+    c_dir = os.getcwd()   
     composed_transform = transforms.Compose([ 
         transforms.ToPILImage(),
         transforms.Resize(224, 224),
@@ -223,19 +224,20 @@ def test_accuracy(model, model_state, batch_size):
 
 
 ### TWO LAYER MODEL TRAIN AND TEST
-num_epochs = 6
-learning_rate =  0.001
-hyp_momentum = 0.9
-batch_size = 100
-
-
-model = resnetTwoLayer()
-model = model.to(device)
-criterion = torch.nn.CrossEntropyLoss().cuda()
-optimizer = torch.optim.SGD(model.parameters(), learning_rate, hyp_momentum)
-
-train(model, criterion, optimizer, num_epochs, batch_size)
-torch.save(model.state_dict(), "./model/one_layer_t.pt")
-
-test_accuracy(model,"./model/one_layer_t.pt", batch_size)
+def to_run():
+    num_epochs = 10
+    learning_rate =  0.001
+    hyp_momentum = 0.9
+    batch_size = 30
+    
+    
+    model = resnetTwoLayer()
+    model = model.to(device)
+    criterion = torch.nn.CrossEntropyLoss().cuda()
+    optimizer = torch.optim.SGD(model.parameters(), learning_rate, hyp_momentum)
+    
+    train(model, criterion, optimizer, num_epochs, batch_size)
+    torch.save(model.state_dict(), "./model/two_layer_t.pt")
+    
+    test_accuracy(model,"./model/two_layer_t.pt", batch_size)
 

@@ -71,11 +71,12 @@ def sliding_window(image, stepSize, windowSize):
 
 resnet_input = [224, 224, 3]
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = resnetTwoLayer()
-model = model.to(device)
-model.load_state_dict(torch.load("./model/two_layer_t.pt", map_location='cpu'))
-model.eval()
+#model = resnetTwoLayer()
+#model = model.to(device)
+#model.load_state_dict(torch.load("./model/two_layer_t.pt", map_location='cpu'))
+#model.eval()
 
+model = torch.load("./model3").to(device)
 composed_transform = transforms.Compose([ 
         transforms.ToPILImage(),
         transforms.Resize((224, 224)),
@@ -249,4 +250,5 @@ with torch.no_grad():
          
 # {'chair': 0.2012559026479721, 'bottle': 0.1512237787246704, 'aeroplane': 0.37917467951774597} 0.24388480186462402
 
-         
+         # -*- coding: utf-8 -*-
+
