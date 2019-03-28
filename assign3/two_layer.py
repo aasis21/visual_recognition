@@ -1,24 +1,17 @@
-# -*- coding: utf-8 -*-
-
-# -*- coding: utf-8 -*-
-from __future__ import division, print_function, unicode_literals
 import numpy as np
 import torch
-import torch.utils.data
 import torchvision.transforms as transforms
-from torch.autograd import Variable
+import torchvision.models as models
+
 import matplotlib.pyplot as plt
-
-import os, random , pickle
-import xml.etree.ElementTree as ET
 from skimage import io
 from skimage.transform import resize
 
-from PIL import Image
-from skimage import io
-from skimage.transform import resize
+import os
+import pickle
 
 resnet_input = [224, 224, 3]
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class voc_dataset(torch.utils.data.Dataset): # Extend PyTorch's Dataset class
     def __init__(self, root_dir, train, transform=None):
@@ -62,113 +55,67 @@ class voc_dataset(torch.utils.data.Dataset): # Extend PyTorch's Dataset class
             
         return img,  np.array(label)
         
-        
-    
-batch_size = 10
-num_epochs = 18
-learning_rate =  0.001
-hyp_momentum = 0.9
 
-composed_transform = transforms.Compose([ 
+
+
+def resnetOneLayer():
+    resnet18 = models.resnet18(pretrained=True)
+    resnet18.fc = nn.Linear(resnet18.fc.in_features, 4)    
+    ct = 0 
+    for child in resnet18.children():
+        ct += 1
+        if ct < 8:
+            for param in child.parameters():
+                param.requires_grad = False
+    return resnet18
+
+class resnetTwoLayer(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        resnet18 = models.resnet18(pretrained=True)
+        children = list(resnet18.children())
+        # features upto 2nd last layer
+        self.features = torch.nn.Sequential(*(children[:-3]))
+
+        # Freeze the layers upto above
+        for layer in self.features.children():
+            for param in layer.parameters():
+                param.requires_grad = False
+
+        # The last ResNet block
+        self.last = children[-3]
+        self.avgpool = torch.nn.AdaptiveAvgPool2d((1, 1))
+        # caoncat the last and 2nd last layer, 256, 512 size
+        self.fc = torch.nn.Sequential(torch.nn.Linear(256 + 512, 4))
+
+    def forward(self, x):
+        x = self.features(x)
+        y = self.last(x)  
+        x = self.avgpool(x)
+        y = self.avgpool(y)
+        # Concatenate before and after
+        x = torch.squeeze(torch.squeeze(torch.cat([x, y], dim=1), dim=3), dim=2)
+        return self.fc(x)
+        
+        
+def train(model, criterion, optimizer, num_epoch, batch_size):
+    c_dir = os.getcwd()   
+    composed_transform = transforms.Compose([ 
         transforms.ToPILImage(),
-        transforms.RandomApply([transforms.RandomCrop((224,224))],p = 0.3),
         transforms.Resize(224, 224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
         ])
-c_dir = os.getcwd()
-   
-train_dataset = voc_dataset(root_dir= c_dir + '/data', train=True, transform=composed_transform) # Supply proper root_dir
-test_dataset = voc_dataset(root_dir= c_dir + '/data', train=False, transform=composed_transform) 
-
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
-
-import torchvision.models as models
-import torch
-from torch import nn
-
-class resnet_two_layer(torch.nn.Module):
-    def __init__(self):
-        torch.nn.Module.__init__(self)
-        model = models.resnet18(pretrained=True)
-        self.features = nn.Sequential(*list(model.children())[0:6])
-        self.final_conv=torch.nn.Conv2d(128, 10, kernel_size=1, stride=1, padding=0)
-#        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Sequential(nn.Linear(7840, 4))
-
-#        self.fc = nn.Sequential(nn.Linear(7840, n_classes), nn.LogSoftmax(dim=1))
-#        
-#        for param in self.features.parameters():
-#            param.requires_grad = False
-
-    def forward(self, X):
-        X = self.features(X)
-        X = self.final_conv(X)
-        X = X.view(X.size(0), -1)
-        X = self.fc(X)
-
-        return X
-    
-model_mid = resnet_two_layer()
-pytorch_total_params = sum(p.numel() for p in model_mid.parameters() )
-print(pytorch_total_params)
-print(model_mid)
-
-total_params = sum(p.numel() for p in model_mid.parameters())
-print(f'{total_params:,} total parameters.')
-total_trainable_params = sum(
-    p.numel() for p in model_mid.parameters() if p.requires_grad)
-print(f'{total_trainable_params:,} training parameters.')
-
-#
-
-#model = models.resnet18(pretrained=True)
-#modules=list(model.children())[0:7] 
-#modules.append(list(model.children())[8])
-#modules.append(nn.Linear(in_features = 256, out_features = 4))
-#model=nn.Sequential(*modules)
-#
-#print(model)
-#
-#ct = 0 
-#for child in model.children():
-#    ct += 1
-#    print(ct, child)
-#    if ct < 9:
-#        for param in child.parameters():
-#            param.requires_grad = False
-
-
-model = model_mid
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-model = model.to(device)
-
-# Find total parameters and trainable parameters
-total_params = sum(p.numel() for p in model.parameters())
-print("total_params:",total_params)
-total_trainable_params = sum( p.numel() for p in model.parameters() if p.requires_grad)
-print("total_trainable_params:" ,  total_trainable_params)
-
-
-import torch.optim as optim
-criterion = nn.CrossEntropyLoss().cuda()
-optimizer = optim.Adam(model.parameters(), learning_rate)
-
-def train():
+    train_dataset = voc_dataset(root_dir= c_dir + '/data', train=True, transform=composed_transform) 
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     for epoch in range(num_epochs):  
         running_loss = 0.0
         accuracy_sum = 0.0
-        
-        t_loss = [0,0.00000000001]
-        t_accur = [0,0.0000000001]
+        t_loss = [0,0]
+        t_accur = [0,0]
         
         for i, data in enumerate(train_loader, 0):
-            print("dhjasfhjk", i)
-            
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -202,78 +149,93 @@ def train():
                 t_accur[1] =  t_accur[1] + 20
                 running_loss = 0.0
                 accuracy_sum = 0.0
+                
         print("EPOCH SUMMARY: loss ", t_loss[0]/t_loss[1], " Accuracy " , t_accur[0]/t_accur[1] )
 
     print('Finished Training')
 
-train()
 
-torch.save(model.state_dict(), "./model/two_layer.pt")
+def test_accuracy(model, model_state, batch_size):
+    composed_transform = transforms.Compose([ 
+        transforms.ToPILImage(),
+        transforms.Resize(224, 224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ])
+        
+    test_dataset = voc_dataset(root_dir= c_dir + '/data', train=False, transform=composed_transform) 
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+    
+    model.load_state_dict(torch.load(model_state))
+    model.eval()
+    
+    ## Test accuarcy overall
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for data in test_loader:
+            inputs, labels = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            outputs = outputs.to(device)
+    
+            _, predicted = torch.max(outputs.data, 1)
+            label = torch.max(labels, 1)[1]
+    
+            total += labels.size(0)
+            correct += (predicted == label).sum().item()
+    
+    print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+    
+    ## classwiz=se accuracy
+    class_correct = list(0. for i in range(4))
+    class_total = list(0. for i in range(4))
+    with torch.no_grad():
+        for data in test_loader:
+            inputs, labels = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            outputs = outputs.to(device)
+            
+            _, predicted = torch.max(outputs, 1)
+            label = torch.max(labels, 1)[1]
+    
+            c = (predicted == label)
+            for i in range(c.size(0)):
+                class_correct[label[i]] += int(c[i].item())
+                class_total[label[i]] += 1
+    
+    
+    
+    for i in range(4):
+        print('Accuracy of %5s : %2d %%' % (
+            i , 100 * class_correct[i] / class_total[i]))
+
+## Find total parameters and trainable parameters
+#total_params = sum(p.numel() for p in model.parameters())
+#print("total_params:",total_params)
+#total_trainable_params = sum( p.numel() for p in model.parameters() if p.requires_grad)
+#print("total_trainable_params:" ,  total_trainable_params)
 
 
 
+### TWO LAYER MODEL TRAIN AND TEST
+num_epochs = 6
+learning_rate =  0.001
+hyp_momentum = 0.9
+batch_size = 100
 
-#### LOAD TRAINED MODEL
-#import torchvision.models as models
-#
-#from torch import nn
-#
-#import torchvision.models as models
-#import torch
-#from torch import nn
-#
-#    
-#model = models.resnet18(pretrained=True)
-#modules=list(model.children())[0:7] 
-#modules.append(list(model.children())[8])
-#model=nn.Sequential(*modules)
-#model.fc = nn.Linear(in_features = 256, out_features = 4)
-#
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#model = model.to(device)
-#
-#model.load_state_dict(torch.load("./model/two_layer.pt"))
-#model.eval()
-#
-### Test accuarcy:
-#correct = 0
-#total = 0
-#with torch.no_grad():
-#    for data in test_loader:
-#        inputs, labels = data
-#        inputs = inputs.to(device)
-#        labels = labels.to(device)
-#        outputs = model(inputs)
-#        outputs = outputs.to(device)
-#
-#        _, predicted = torch.max(outputs.data, 1)
-#        label = torch.max(labels, 1)[1]
-#
-#        total += labels.size(0)
-#        correct += (predicted == label).sum().item()
-#
-#print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
-#
-#class_correct = list(0. for i in range(4))
-#class_total = list(0. for i in range(4))
-#with torch.no_grad():
-#    for data in test_loader:
-#        inputs, labels = data
-#        inputs = inputs.to(device)
-#        labels = labels.to(device)
-#        outputs = model(inputs)
-#        outputs = outputs.to(device)
-#        
-#        _, predicted = torch.max(outputs, 1)
-#        label = torch.max(labels, 1)[1]
-#
-#        c = (predicted == label)
-#        for i in range(c.size(0)):
-#            class_correct[label[i]] += int(c[i].item())
-#            class_total[label[i]] += 1
-#
-#
-#
-#for i in range(4):
-#    print('Accuracy of %5s : %2d %%' % (
-#        i , 100 * class_correct[i] / class_total[i]))
+
+model = resnetTwoLayer()
+model = model.to(device)
+criterion = torch.nn.CrossEntropyLoss().cuda()
+optimizer = torch.optim.SGD(model.parameters(), learning_rate, hyp_momentum)
+
+train(model, criterion, optimizer, num_epochs, batch_size)
+torch.save(model.state_dict(), "./model/one_layer_t.pt")
+
+test_accuracy(model,"./model/one_layer_t.pt", batch_size)
+

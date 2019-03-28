@@ -68,7 +68,6 @@ hyp_momentum = 0.9
 
 composed_transform = transforms.Compose([ 
         transforms.ToPILImage(),
-        transforms.RandomApply([transforms.RandomCrop((224,224))],p = 0.3),
         transforms.Resize(224, 224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
@@ -96,7 +95,7 @@ model = resnet18
 ct = 0 
 for child in model.children():
     ct += 1
-    if ct < 9:
+    if ct < 8:
         for param in child.parameters():
             param.requires_grad = False
 
@@ -114,7 +113,7 @@ print(model)
 
 import torch.optim as optim
 criterion = nn.CrossEntropyLoss().cuda()
-optimizer = optim.Adam(resnet18.parameters(), learning_rate)
+optimizer = optim.SGD(resnet18.parameters(), learning_rate, hyp_momentum)
 
 def train():
     for epoch in range(num_epochs):  
@@ -151,7 +150,7 @@ def train():
             accuracy_sum = accuracy_sum + accr
             # print statistics
             running_loss += loss.item()
-            if i % 20 == 0:    # print every 2000 mini-batches
+            if i % 20 == 19:    # print every 2000 mini-batches
                 print('[%d, %5d] loss: %.3f accurcy: %.3f'  %
                       (epoch + 1, i + 1, running_loss / 20, accuracy_sum/ 20 ))
                 t_loss[0] = t_loss[0] + running_loss
@@ -166,7 +165,7 @@ def train():
 
 train()
 
-torch.save(model.state_dict(), "./model/one_layer.pt")
+torch.save(model.state_dict(), "./model/one_layer_t.pt")
 
 
 
@@ -181,7 +180,7 @@ model = resnet18
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
-model.load_state_dict(torch.load("./model/one_layer.pt"))
+model.load_state_dict(torch.load("./model/one_layer_t.pt"))
 model.eval()
 
 ## Test accuarcy:
