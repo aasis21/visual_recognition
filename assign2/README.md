@@ -18,6 +18,29 @@ For fine grained classification, you are free to choose any algorithm of choice.
 
 You can divide the given dataset into training, validation and test sets in whichever manner you see fit.
 
+### Approach
+We used **CNN with Transfer learning and data augmentation**  to solve the problem. The detailed report can be found [here](report.pdf).
+
+### Result
+We achieved approx 98% accuracy an course classification and 84% accuracy on fine classification.
+
+### Code
+File Included in code folder:
+
+COARSE :    
+    coarse.py : For Coarse Classification
+
+FINE:    
+    fine_aircrafts.py 
+    fine_birds.py
+    fine_cars.py
+    fine_dogs.py
+    fine_flowers.py
+
+
+PREDICTION:
+    predict.py : run this to get coarse and fine prediction. Assumes models in place. Generates output.txt
+
 ### Dataset
 
 The training data can be downloaded from here: [here](https://drive.google.com/drive/folders/1H8H2NS193l78A6xsDyi5iEQpUGlSsn51?fbclid=IwAR0J7KFVd_sdPBCyQwqw5balQHpTLoTxqfdv5pZ_ElMb5IyRS9MDw2ejlyw)
