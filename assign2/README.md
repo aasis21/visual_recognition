@@ -25,7 +25,7 @@ We used **CNN with Transfer learning and data augmentation**  to solve the probl
 We achieved approx 98% accuracy an course classification and 84% accuracy on fine classification.
 
 ### Code
-File Included in code folder:
+File Included in src folder:
 
 COARSE :    
     coarse.py : For Coarse Classification
