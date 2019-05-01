@@ -1,0 +1,11 @@
+numpy 0.2.2
+opencv-python 0.2.2
+torch 0.2.2
+torchvision 0.2.2
+skimage 0.14.2
+matplotlib 2.2.0
+xml 
+os
+pickle
+random 
+sys
