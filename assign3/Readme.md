@@ -10,5 +10,5 @@ The aim of this asssignment is to detect bounding box and lebel objects(aeroplan
 - Apply NMS to get final result.
 
 ### Code and Report
-The whole code can be found [here](assignment_3.ipynb). The Report with model accuracy can be found [here](cs783_assign3.pdf). 
+The whole code can be found [here](assignment_3.ipynb). The Report with model accuracy can be found [here](report.pdf). 
 
